@@ -1,0 +1,80 @@
+#!/bin/bash
+set -e
+PROGNAME=$(basename "$0")
+PROGNAME=${PROGNAME%-sub}
+CMDNAME=${PROGNAME//-/ }
+SCRIPTS_TOPDIR=$(cd $(dirname "$0") && cd .. && pwd)
+source "${SCRIPTS_TOPDIR}/lib/revdb-functions.include.sh"
+source "${SCRIPTS_TOPDIR}/conf/config.sh.conf"
+
+show_usage()
+{
+    cat <<__DOC__
+Usage: ${CMDNAME} PROJECT-ID FIRST-REVISION PROJECT-DESCRIPTION...
+
+__DOC__
+}
+
+PROJECTID_ORIG="$1"
+if [ -z "${PROJECTID_ORIG}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: must provide project ID"
+    show_usage >&2
+    exit 1
+fi
+
+PROJECTID=$(echo -n "$PROJECTID_ORIG" | revdb_read_exactly_one_word)
+if [ "${PROJECTID_ORIG}" != "${PROJECTID}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: must provide valid project ID"
+    show_usage >&2
+    exit 1
+fi
+
+shift
+FIRST_REVISION_INP=$(echo -n "$1" | revdb_read_exactly_one_number)
+if [ -z "${FIRST_REVISION_INP}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: must provide valid first revision"
+    show_usage >&2
+    exit 1
+fi
+
+shift
+DESCRIPTION="$@"
+
+if [ -z "${DESCRIPTION}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: must provide project description"
+    show_usage >&2
+    exit 1
+fi
+
+CURR_DATE=$(TZ=UTC LANG=C date '+%Y-%m-%d %H:%M:%S')
+DESCRIPTION_FILTERED=$(echo -n "${DESCRIPTION}" | revdb_read_exactly_one_line)
+
+SUBDIR=$(revdb_get_subdir "${PROJECTID}")
+if [ -d "${DBDIR}/${SUBDIR}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: project ${PROJECTID} already exists"
+    exit 1
+fi
+
+mkdir -p "${DBDIR}/${SUBDIR}"
+
+## record project into project list
+cp --archive "${DBDIR}/projects.txt" "${DBDIR}/projects.txt.old"
+{
+cat "${DBDIR}/projects.txt"
+echo "|${PROJECTID}|${CURR_DATE}|${DESCRIPTION_FILTERED}|"
+} | LANG=C sort -t '|' -k 2,2 >"${DBDIR}/projects.txt.new"
+mv "${DBDIR}/projects.txt.new" "${DBDIR}/projects.txt"
+
+## initialize the rest of the project
+FIRST_NUMBER=$(cd ${DBDIR}/${SUBDIR} && revdb_number_init "${FIRST_REVISION_INP}")
+if [ -z "${FIRST_NUMBER}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: no first revision number for project ${PROJECTID}"
+    exit 1
+fi
+
+touch "${DBDIR}/${SUBDIR}/revisions.txt"
+cp --archive "${DBDIR}/${SUBDIR}/revisions.txt" "${DBDIR}/${SUBDIR}/revisions.txt.old"
+
+show_error    "${PROGNAME}: project ${PROJECTID} created"
+echo "${FIRST_NUMBER}"
+exit 0

@@ -1,0 +1,43 @@
+#!/bin/bash
+set -e
+PROGNAME=$(basename "$0")
+PROGNAME=${PROGNAME%-sub}
+CMDNAME=${PROGNAME//-/ }
+SCRIPTS_TOPDIR=$(cd $(dirname "$0") && cd .. && pwd)
+source "${SCRIPTS_TOPDIR}/lib/revdb-functions.include.sh"
+source "${SCRIPTS_TOPDIR}/conf/config.sh.conf"
+
+show_usage()
+{
+    cat <<__DOC__
+Usage: ${CMDNAME} PROJECT-ID
+
+__DOC__
+}
+
+PROJECTID_ORIG="$1"
+if [ -z "${PROJECTID_ORIG}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: must provide project ID"
+    show_usage >&2
+    exit 1
+fi
+
+PROJECTID=$(echo -n "$PROJECTID_ORIG" | revdb_read_exactly_one_word)
+if [ "${PROJECTID_ORIG}" != "${PROJECTID}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: must provide valid project ID"
+    show_usage >&2
+    exit 1
+fi
+
+SUBDIR=$(revdb_get_subdir "${PROJECTID}")
+if [ ! -d "${DBDIR}/${SUBDIR}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: no such project ${PROJECTID}"
+    exit 1
+fi
+
+{
+echo "|REVISION-NO|CREATE-DATE|REVISION-DESCRIPTION|"
+cat "${DBDIR}/${SUBDIR}/revisions.txt"
+} | column -t -s '|'
+
+exit 0

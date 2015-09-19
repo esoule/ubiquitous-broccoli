@@ -1,0 +1,55 @@
+#!/bin/bash
+set -e
+PROGNAME=$(basename "$0")
+SCRIPTS_TOPDIR=$(cd $(dirname "$0") && cd .. && pwd)
+source "${SCRIPTS_TOPDIR}/lib/revdb-functions.include.sh"
+source "${SCRIPTS_TOPDIR}/conf/config.sh.conf"
+
+show_usage()
+{
+    cat <<__DOC__
+Usage: ${PROGNAME} ...
+
+revdb db init          Initialize a database
+revdb db show          Display contents of a database
+revdb project init     Initialize a project
+revdb project getnext  Reserve next revision number in a project
+revdb project show     Display revisions of a project
+
+__DOC__
+}
+
+cmd1="$1"
+cmd2="$2"
+
+if [ -z "${cmd1}" -o -z "${cmd2}" ] ; then
+    show_usage >&2
+    exit 1
+fi
+shift
+shift
+
+SUBPROG="${PROGNAME}-${cmd1}-${cmd2}-sub"
+if [ ! -x "${SCRIPTS_TOPDIR}/libexec/${SUBPROG}" ] ; then
+    show_error    "ERROR: ${PROGNAME}: unknown command"
+    show_usage >&2
+    exit 1
+fi
+
+if [ "${SUBPROG}" = "revdb-db-init-sub" ] ; then
+    if [ -e "${DBDIR}" ] ; then
+        show_error    "ERROR: ${PROGNAME}: file/directory already exists: ${DBDIR}"
+        show_usage >&2
+        exit 1
+    fi
+    mkdir -p "${DBDIR}"
+    mkdir "${DBDIR}/.lock"
+fi
+
+exec 100<"${DBDIR}/.lock"
+if flock -x -w 5 100 ; then
+    "${SCRIPTS_TOPDIR}/libexec/${SUBPROG}" "$@"
+else
+    show_error    "${PROGNAME}: Could not acquire lock"
+fi
+exec 100<&-

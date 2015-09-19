@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+PROGNAME=$(basename "$0")
+PROGNAME=${PROGNAME%-sub}
+CMDNAME=${PROGNAME//-/ }
+SCRIPTS_TOPDIR=$(cd $(dirname "$0") && cd .. && pwd)
+source "${SCRIPTS_TOPDIR}/lib/revdb-functions.include.sh"
+source "${SCRIPTS_TOPDIR}/conf/config.sh.conf"
+
+show_usage()
+{
+    cat <<__DOC__
+Usage: ${CMDNAME}
+
+__DOC__
+}
+
+mkdir "${DBDIR}/objects"
+touch "${DBDIR}/projects.txt"
+cp --archive "${DBDIR}/projects.txt" "${DBDIR}/projects.txt.old"
+
+show_error    "${PROGNAME}: database ${DBDIR} created"
+exit 0
